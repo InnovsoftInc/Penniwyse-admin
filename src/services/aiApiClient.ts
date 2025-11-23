@@ -41,7 +41,7 @@ class AiApiClient {
         });
 
         if (!config.headers) {
-          config.headers = {};
+          config.headers = {} as any;
         }
 
         // Add service token and service name
@@ -152,10 +152,13 @@ class AiApiClient {
             data: errorData,
             dataType: typeof errorData,
             dataKeys: errorData && typeof errorData === 'object' ? Object.keys(errorData) : [],
-            message: errorData?.message || errorData?.error?.message,
-            error: errorData?.error,
-            details: errorData?.details || errorData?.error?.details,
-            requiredHeaders: errorData?.details?.required_headers || errorData?.error?.details?.required_headers,
+            message: (typeof errorData === 'object' && errorData && 'message' in errorData ? (errorData as any).message : null) || 
+                     (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'message' in (errorData as any).error ? (errorData as any).error.message : null),
+            error: typeof errorData === 'object' && errorData && 'error' in errorData ? (errorData as any).error : null,
+            details: (typeof errorData === 'object' && errorData && 'details' in errorData ? (errorData as any).details : null) || 
+                    (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'details' in (errorData as any).error ? (errorData as any).error.details : null),
+            requiredHeaders: (typeof errorData === 'object' && errorData && 'details' in errorData && typeof (errorData as any).details === 'object' && (errorData as any).details && 'required_headers' in (errorData as any).details ? (errorData as any).details.required_headers : null) ||
+                            (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'details' in (errorData as any).error && typeof (errorData as any).error.details === 'object' && (errorData as any).error.details && 'required_headers' in (errorData as any).error.details ? (errorData as any).error.details.required_headers : null),
             // Log what headers were sent
             sentHeaders: {
               authorization: originalRequest?.headers?.['Authorization'] ? 'present' : 'missing',
@@ -254,8 +257,8 @@ class AiApiClient {
           
           // If already retried or no refresh token, extract error message and reject
           let errorMessage = 'Authentication required. Please log in to access AI endpoints.';
-          if (errorData?.error?.message) {
-            errorMessage = errorData.error.message;
+          if (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'message' in (errorData as any).error) {
+            errorMessage = (errorData as any).error.message;
           } else if (errorData?.message) {
             errorMessage = errorData.message;
           } else if (typeof errorData === 'string') {

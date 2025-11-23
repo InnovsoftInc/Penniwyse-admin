@@ -1,6 +1,6 @@
 import { apiClient } from '../apiClient';
 import type { User, UserProfile, LoginHistory, ActivityLog } from '../../types/user.types';
-import type { PaginatedResponse, PaginatedResponseAlt, QueryParams } from '../../types/api.types';
+import type { PaginatedResponseAlt, QueryParams } from '../../types/api.types';
 
 class UsersService {
   async getUsers(params?: QueryParams): Promise<PaginatedResponseAlt<User>> {

@@ -37,14 +37,13 @@ export function MerchantForm({
   const [logoPreview, setLogoPreview] = useState<string | null>(
     initialData?.logoBase64 || initialData?.logo || null
   );
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [, setLogoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<MerchantFormData>({
     resolver: zodResolver(merchantSchema),

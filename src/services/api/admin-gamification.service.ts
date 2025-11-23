@@ -10,7 +10,6 @@ import type {
   QuestRule,
   CreateQuestRuleDto,
   UpdateQuestRuleDto,
-  XPLevel,
   UpdateXPLevelsDto,
 } from '../../types/gamification.types';
 import type { QueryParams, PaginatedResponseAlt } from '../../types/api.types';
@@ -111,11 +110,11 @@ class AdminGamificationService {
         const badgesResponse = await this.getBadges({ isActive: true, limit: 1000 });
         const badges = Array.isArray(badgesResponse.items) ? badgesResponse.items : [];
         return badges
-          .filter((badge: Badge) => badge.isActive && badge.key)
+          .filter((badge: Badge) => badge.key)
           .map((badge: Badge) => ({
             key: badge.key!,
             name: badge.name || badge.key!,
-            isActive: badge.isActive ?? true,
+            isActive: true,
           }));
       }
       throw err;
@@ -136,7 +135,7 @@ class AdminGamificationService {
           .filter((quest: Quest) => quest.isActive && quest.slug)
           .map((quest: Quest) => ({
             slug: quest.slug!,
-            name: quest.name || quest.title || quest.slug!,
+            name: quest.name || quest.slug!,
             isActive: quest.isActive ?? true,
           }));
       }

@@ -6,7 +6,6 @@ import {
   FolderTree,
   Store,
   Lightbulb,
-  Mail,
   Trophy,
   Receipt,
   FileText,

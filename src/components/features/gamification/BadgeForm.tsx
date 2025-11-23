@@ -7,7 +7,7 @@ import { Input, Button, Modal } from '../../ui';
 import { BadgeIcon } from './BadgeIcon';
 import type { CreateBadgeDto, UpdateBadgeDto, Badge } from '../../../types/gamification.types';
 
-const badgeSchema = z.object({
+const createBadgeSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
   icon: z.string().optional(),
@@ -17,6 +17,14 @@ const badgeSchema = z.object({
     (val) => !val || /^[a-z0-9_-]+$/.test(val),
     { message: 'Slug must be lowercase alphanumeric with underscores or hyphens' }
   ),
+});
+
+const updateBadgeSchema = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
+  description: z.string().optional(),
+  icon: z.string().optional(),
+  key: z.string().min(1, 'Key is required').regex(/^[a-z0-9_-]+$/, 'Key must be lowercase alphanumeric with underscores or hyphens').optional(),
+  category: z.string().optional(),
 });
 
 type BadgeFormData = CreateBadgeDto | UpdateBadgeDto;
@@ -40,7 +48,7 @@ export function BadgeForm({
     watch,
     formState: { errors },
   } = useForm<BadgeFormData>({
-    resolver: zodResolver(badgeSchema),
+    resolver: zodResolver(initialData?.id ? updateBadgeSchema : createBadgeSchema) as any,
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
@@ -163,7 +171,7 @@ export function BadgeForm({
           label="Slug"
           placeholder="badge-name-slug"
           {...register('slug')}
-          error={errors.slug?.message}
+          error={(errors as any).slug?.message}
           helperText="URL-friendly identifier (lowercase, alphanumeric, underscores/hyphens only). Not editable after creation."
         />
       )}

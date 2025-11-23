@@ -12,7 +12,7 @@ const questSchema = z.object({
   slug: z.string().min(1, 'Slug is required').regex(/^[a-z0-9_-]+$/, 'Slug must be lowercase alphanumeric with hyphens or underscores'),
   category: z.string().optional(),
   isActive: z.boolean().optional(),
-  requirements: z.string().optional(),
+  requirements: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
 });
 
 type QuestFormData = CreateQuestDto | UpdateQuestDto;
@@ -34,10 +34,8 @@ export function QuestForm({
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
-    watch,
   } = useForm<QuestFormData>({
-    resolver: zodResolver(questSchema),
+    resolver: zodResolver(questSchema) as any,
     defaultValues: {
       name: initialData?.name || '',
       description: initialData?.description || '',
@@ -54,7 +52,6 @@ export function QuestForm({
     },
   });
 
-  const requirementsValue = watch('requirements');
 
   const onFormSubmit = async (data: QuestFormData) => {
     // Parse requirements if it's a JSON string

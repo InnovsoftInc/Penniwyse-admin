@@ -1,5 +1,4 @@
 import { Trophy, TrendingUp } from 'lucide-react';
-import { cn } from '../../../utils/cn';
 import type { UserProgress } from '../../../types/gamification.types';
 
 interface XPProgressProps {

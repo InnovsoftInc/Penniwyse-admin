@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EmailTemplate } from '../../types/email-template.types';
+import type { EmailTemplate } from '../../../types/email-template.types';
 
 interface EmailTemplatePreviewProps {
   template: EmailTemplate;
@@ -72,7 +72,7 @@ export function EmailTemplatePreview({ template }: EmailTemplatePreviewProps) {
           <div>
             <span className="font-medium text-gray-700 text-sm">Variables:</span>
             <div className="flex flex-wrap gap-1 mt-1">
-              {template.variables.map((variable, idx) => (
+              {template.variables?.map((variable: string, idx: number) => (
                 <span key={idx} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
                   {`{{${variable}}}`}
                 </span>

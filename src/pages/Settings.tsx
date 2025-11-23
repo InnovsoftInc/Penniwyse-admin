@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Save, RefreshCw, Key, Server, Clock, Eye, X, Plus, Edit, Trash2, Play, Pause, PlayCircle } from 'lucide-react';
+import { RefreshCw, Clock, Eye, Plus, Edit, Trash2, Play, Pause, PlayCircle } from 'lucide-react';
 import { Card, Button, Input, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Pagination, Modal } from '../components/ui';
 import { cronService } from '../services/api/cron.service';
 import { dashboardService } from '../services/api/dashboard.service';
 import { filesJobsService } from '../services/api/files-jobs.service';
 import { ScheduleForm } from '../components/features/cron';
 import type { CronStatus, CronLog, CronJobInfo, CronSchedule, CreateCronScheduleDto, UpdateCronScheduleDto } from '../types/cron.types';
-import type { AiCronJobsResponse, AiCronStatus, AiCronJob, CronJobExecution, CronExecutionHistoryQueryParams } from '../types/ai-cron.types';
+import type { AiCronJobsResponse, AiCronStatus, CronJobExecution, CronExecutionHistoryQueryParams } from '../types/ai-cron.types';
 import { formatDateTime } from '../utils/formatters';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<'general' | 'cron-schedules' | 'cron-jobs' | 'cron-logs' | 'ai-cron-jobs' | 'ai-logs'>('general');
   
-  const [cronStatus, setCronStatus] = useState<CronStatus | null>(null);
+  const [, setCronStatus] = useState<CronStatus | null>(null);
   const [recentLogs, setRecentLogs] = useState<CronLog[]>([]);
   const [cronJobs, setCronJobs] = useState<CronJobInfo[]>([]);
-  const [cronJobsStats, setCronJobsStats] = useState<{ count?: number; enabledJobs?: number; disabledJobs?: number }>({});
+  const [cronJobsStats] = useState<{ count?: number; enabledJobs?: number; disabledJobs?: number }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [serviceToken, setServiceToken] = useState<string>('');
@@ -76,7 +76,7 @@ export function Settings() {
       setIsLoading(true);
       setError(null);
       
-      const [jobsResponse, logsResponse, health] = await Promise.all([
+      const [jobsResponse, logsResponse] = await Promise.all([
         cronService.getCronJobs().catch((err) => {
           if (err?.response?.status === 404) {
             console.warn('Cron jobs endpoint not available yet.');
@@ -925,8 +925,8 @@ export function Settings() {
                         const hasMetadata = log.metadata && Object.keys(log.metadata).length > 0;
                         const hasSummary = log.summary && Object.keys(log.summary).length > 0;
                         const parts = [];
-                        if (hasMetadata) parts.push(`${Object.keys(log.metadata).length} fields`);
-                        if (hasSummary) parts.push(`${Object.keys(log.summary).length} fields`);
+                        if (hasMetadata && log.metadata) parts.push(`${Object.keys(log.metadata).length} fields`);
+                        if (hasSummary && log.summary) parts.push(`${Object.keys(log.summary).length} fields`);
                         return parts.length > 0 ? parts.join(', ') : 'Empty';
                       })()}
                     </div>
@@ -1072,10 +1072,14 @@ export function Settings() {
                         <label className="block text-sm font-medium text-gray-700 cursor-pointer mb-1">
                           Summary
                         </label>
-                        {/* Show key summary fields prominently if they exist */}
-                        {selectedLog.summary.message && (
-                          <p className="text-xs text-green-700 font-medium">{String(selectedLog.summary.message)}</p>
-                        )}
+                        {(() => {
+                          const summaryMessage = selectedLog.summary && typeof selectedLog.summary === 'object' && 'message' in selectedLog.summary 
+                            ? String(selectedLog.summary.message as string | number | boolean | null | undefined)
+                            : null;
+                          return summaryMessage ? (
+                            <p className="text-xs text-green-700 font-medium">{summaryMessage}</p>
+                          ) : null;
+                        })()}
                         {Array.isArray(selectedLog.summary.errors) && selectedLog.summary.errors.length > 0 && (
                           <p className="text-xs text-red-700 mt-1">
                             {selectedLog.summary.errors.length} error{selectedLog.summary.errors.length !== 1 ? 's' : ''} found

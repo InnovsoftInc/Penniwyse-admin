@@ -29,7 +29,7 @@ export function Subscriptions() {
         () => usersService.getUsers({ limit: 100 }),
         30000 // 30 seconds
       );
-      setUsers(response.items || response.data || []);
+      setUsers(response.items || []);
     } catch (err) {
       setError('Failed to load subscriptions');
       console.error(err);

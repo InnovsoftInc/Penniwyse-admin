@@ -20,7 +20,7 @@ class MerchantsService {
     return response.data;
   }
 
-  async updateMerchantMapping(merchantName: string, data: CreateMerchantMappingDto): Promise<Merchant> {
+  async updateMerchantMapping(_merchantName: string, data: CreateMerchantMappingDto): Promise<Merchant> {
     // POST endpoint creates or updates
     const response = await apiClient.getClient().post<Merchant>('/api/merchants', data);
     return response.data;

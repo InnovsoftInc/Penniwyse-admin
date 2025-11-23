@@ -204,7 +204,11 @@ export function Categories() {
         size="md"
       >
         <CategoryForm
-          onSubmit={editingCategory ? handleUpdate : handleCreate}
+          onSubmit={editingCategory ? (async (data: CreateCategoryDto | UpdateCategoryDto) => {
+            await handleUpdate(data as UpdateCategoryDto);
+          }) : (async (data: CreateCategoryDto | UpdateCategoryDto) => {
+            await handleCreate(data as CreateCategoryDto);
+          })}
           onCancel={() => {
             setIsModalOpen(false);
             setEditingCategory(null);

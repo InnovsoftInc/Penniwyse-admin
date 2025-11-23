@@ -5,11 +5,29 @@ import { z } from 'zod';
 import { Input, Button, Select } from '../../ui';
 import type { CreateNotificationTemplateDto, UpdateNotificationTemplateDto, NotificationTemplate } from '../../../types/notification-template.types';
 
-const notificationTemplateSchema = z.object({
+const createNotificationTemplateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   title: z.string().optional(),
   body: z.string().optional(),
   type: z.string().min(1, 'Type is required'),
+  variables: z.string().optional(),
+  platform: z.enum(['ios', 'android', 'all']).optional(),
+  priority: z.enum(['default', 'normal', 'high', 'low']).optional(),
+  sound: z.string().optional(),
+  badge: z.number().min(0).max(999).optional(),
+  channelId: z.string().optional(),
+  category: z.string().optional(),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+}).refine((data) => data.title || data.body, {
+  message: 'At least one of title or body must be provided',
+  path: ['body'],
+});
+
+const updateNotificationTemplateSchema = z.object({
+  title: z.string().optional(),
+  body: z.string().optional(),
+  type: z.string().optional(),
   variables: z.string().optional(),
   platform: z.enum(['ios', 'android', 'all']).optional(),
   priority: z.enum(['default', 'normal', 'high', 'low']).optional(),
@@ -88,7 +106,7 @@ export function NotificationTemplateForm({
     setValue,
     watch,
   } = useForm<NotificationTemplateFormData>({
-    resolver: zodResolver(notificationTemplateSchema),
+    resolver: zodResolver(initialData?.name ? updateNotificationTemplateSchema : createNotificationTemplateSchema) as any,
     defaultValues: {
       name: initialData?.name || '',
       title: initialData?.title || '',
@@ -96,7 +114,9 @@ export function NotificationTemplateForm({
       type: initialData?.type || '',
       variables: Array.isArray(initialData?.variables)
         ? initialData.variables.join(', ')
-        : initialData?.variables?.join(', ') || '',
+        : typeof initialData?.variables === 'string'
+        ? initialData.variables
+        : '' as any,
       platform: initialData?.platform || 'all',
       priority: initialData?.priority || 'default',
       sound: initialData?.sound || '',
@@ -109,19 +129,22 @@ export function NotificationTemplateForm({
   });
 
   const isActive = watch('isActive');
-  const variablesString = watch('variables');
+  const variablesString = watch('variables') as string | string[] | undefined;
   const title = watch('title');
   const body = watch('body');
-  const type = watch('type');
 
   // Auto-detect variables
   const autoDetectVariables = () => {
     const allText = `${title || ''} ${body || ''}`;
     const detected = detectVariables(allText);
     if (detected.length > 0) {
-      const currentVars = variablesString ? variablesString.split(',').map(v => v.trim()).filter(v => v) : [];
+      const currentVars = variablesString 
+        ? (typeof variablesString === 'string' 
+            ? variablesString.split(',').map((v: string) => v.trim()).filter((v: string) => v) 
+            : Array.isArray(variablesString) ? variablesString : [])
+        : [];
       const combined = Array.from(new Set([...currentVars, ...detected]));
-      setValue('variables', combined.join(', '));
+      setValue('variables', combined.join(', ') as any);
     }
   };
 
@@ -137,17 +160,17 @@ export function NotificationTemplateForm({
       ...data,
       variables: data.variables
         ? (typeof data.variables === 'string'
-            ? data.variables.split(',').map(v => v.trim()).filter(v => v.length > 0)
-            : data.variables)
+            ? (data.variables as any).split(',').map((v: string) => v.trim()).filter((v: string) => v.length > 0)
+            : Array.isArray(data.variables) ? data.variables : [])
         : undefined,
     };
     await onSubmit(processedData);
   };
 
   const insertVariable = (variable: string) => {
-    const current = variablesString || '';
+    const current = typeof variablesString === 'string' ? variablesString : (Array.isArray(variablesString) ? variablesString.join(', ') : '');
     const newValue = current ? `${current}, ${variable}` : variable;
-    setValue('variables', newValue);
+    setValue('variables', newValue as any);
   };
 
   return (
@@ -166,7 +189,7 @@ export function NotificationTemplateForm({
           ) : (
             <Input
               {...register('name')}
-              error={errors.name?.message}
+              error={(errors as any).name?.message}
               required
               placeholder="bill_reminder_custom"
               helperText="Unique identifier for this template (e.g., bill_reminder_custom)"

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -100,11 +99,12 @@ export function TableHead({ children, className, sortable, sortDirection, onSort
 interface TableCellProps {
   children: ReactNode;
   className?: string;
+  title?: string;
 }
 
-export function TableCell({ children, className }: TableCellProps) {
+export function TableCell({ children, className, title }: TableCellProps) {
   return (
-    <td className={cn('px-6 py-4 whitespace-nowrap text-sm text-gray-900', className)}>
+    <td className={cn('px-6 py-4 whitespace-nowrap text-sm text-gray-900', className)} title={title}>
       {children}
     </td>
   );
@@ -138,7 +138,7 @@ export function Pagination({
   totalItems,
   itemsPerPage,
   onPageChange,
-  onItemsPerPageChange,
+  onItemsPerPageChange: _onItemsPerPageChange,
 }: PaginationProps) {
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);

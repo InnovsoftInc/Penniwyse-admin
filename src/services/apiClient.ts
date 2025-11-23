@@ -194,9 +194,9 @@ class ApiClient {
     return cookieUtils.getRefreshToken();
   }
 
-  private setAccessToken(token: string): void {
-    cookieUtils.setAccessToken(token);
-  }
+  // private _setAccessToken(token: string): void {
+  //   cookieUtils.setAccessToken(token);
+  // }
 
   private clearTokens(): void {
     cookieUtils.clearTokens();

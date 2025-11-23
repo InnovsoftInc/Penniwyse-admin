@@ -8,7 +8,7 @@ import { requestCache } from '../utils/requestCache';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export function Analytics() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userStats, setUserStats] = useState({ total: 0, active: 0 });
   const [transactionStats, setTransactionStats] = useState({ total: 0, amount: 0 });
@@ -35,7 +35,7 @@ export function Analytics() {
           () => usersService.getUsers({ limit: 1 }),
           30000 // 30 seconds
         );
-        usersCount = usersResponse.total || 0;
+        usersCount = usersResponse.meta?.total || 0;
       } catch {
         // Endpoint doesn't exist, use default
         usersCount = 0;

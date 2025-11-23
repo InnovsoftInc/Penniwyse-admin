@@ -7,7 +7,6 @@ import type {
   CronStatisticsQueryParams,
   TriggerJobResponse,
   RunningJob,
-  CronJobInfo,
   CronJobsResponse,
   CronSchedule,
   CreateCronScheduleDto,

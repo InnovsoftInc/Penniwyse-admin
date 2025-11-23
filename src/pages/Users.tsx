@@ -4,7 +4,7 @@ import { usersService } from '../services/api/users.service';
 import type { User, UserProfile, LoginHistory, ActivityLog } from '../types/user.types';
 import { formatDate, formatDateTime } from '../utils/formatters';
 import { requestCache } from '../utils/requestCache';
-import { Search, Trophy, Award, TrendingUp, Eye, Edit } from 'lucide-react';
+import { Search, Trophy, Award, Eye, Edit } from 'lucide-react';
 
 export function Users() {
   const [users, setUsers] = useState<User[]>([]);
@@ -17,7 +17,7 @@ export function Users() {
   const [activeTab, setActiveTab] = useState<'profile' | 'gamification' | 'history' | 'activity'>('profile');
   const [xpAmount, setXpAmount] = useState('');
   const [badgeId, setBadgeId] = useState('');
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     // Debounce search to prevent too many requests
@@ -45,7 +45,7 @@ export function Users() {
         () => usersService.getUsers({ search: searchTerm, limit: 100 }),
         10000 // 10 second cache
       );
-      setUsers(response.items || response.data || []);
+      setUsers(response.items || []);
     } catch (error) {
       console.error('Failed to load users:', error);
       // Endpoint may not exist - show empty state
@@ -63,8 +63,8 @@ export function Users() {
         usersService.getActivityLogs(userId, { limit: 20 }),
       ]);
       setSelectedUser(profile);
-      setLoginHistory(history.items || history.data || []);
-      setActivityLogs(logs.items || logs.data || []);
+      setLoginHistory(history.items || []);
+      setActivityLogs(logs.items || []);
     } catch (error) {
       console.error('Failed to load user details:', error);
     }

@@ -37,3 +37,10 @@ export interface SystemHealth {
   }>;
 }
 
+export interface AiServiceHealth {
+  status: 'healthy' | 'unhealthy';
+  timestamp: string;
+  version?: string;
+  dependencies?: Record<string, string>;
+}
+

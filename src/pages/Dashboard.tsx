@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { Users, CreditCard, DollarSign, TrendingUp, Activity } from 'lucide-react';
+import { Users, CreditCard, DollarSign, Server, CheckCircle2, XCircle, Activity } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { dashboardService } from '../services/api/dashboard.service';
 import { usersService } from '../services/api/users.service';
 import { transactionsService } from '../services/api/transactions.service';
-import type { DashboardStats, SystemHealth } from '../types/dashboard.types';
+import type { DashboardStats, SystemHealth, AiServiceHealth } from '../types/dashboard.types';
 import { formatCurrency } from '../utils/formatters';
 import { requestCache } from '../utils/requestCache';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -17,6 +17,7 @@ export function Dashboard() {
     totalRevenue: 0,
   });
   const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [aiHealth, setAiHealth] = useState<AiServiceHealth | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
@@ -36,7 +37,7 @@ export function Dashboard() {
       
       // Use cache to prevent duplicate requests (30 second cache)
       // Health endpoint may not exist, so we catch and ignore 404s
-      const [transactionsResponse, healthData] = await Promise.all([
+      const [transactionsResponse, healthData, aiHealthData] = await Promise.all([
         requestCache.get(
           'dashboard-transactions-summary',
           () => transactionsService.getTransactionSummary().catch(() => ({ summary: { totalTransactions: 0, totalAmount: 0 } })),
@@ -54,17 +55,29 @@ export function Dashboard() {
           }),
           60000 // 1 minute
         ),
+        requestCache.get(
+          'dashboard-ai-health',
+          () => dashboardService.getAiServiceHealth().catch((err) => {
+            // Silently ignore 404s, network errors, or auth errors for AI health endpoint
+            if (err?.response?.status === 404 || err?.isNetworkError || err?.isAuthError) {
+              return null;
+            }
+            console.warn('Failed to load AI service health:', err);
+            return null;
+          }),
+          60000 // 1 minute
+        ),
       ]);
 
       // Try to get users count if endpoint exists, otherwise use 0
       let usersCount = 0;
       try {
-        const usersResponse = await requestCache.get(
+        const         usersResponse = await requestCache.get(
           'dashboard-users-count',
           () => usersService.getUsers({ limit: 1 }),
           30000 // 30 seconds
         );
-        usersCount = usersResponse.total || 0;
+        usersCount = usersResponse.meta?.total || 0;
       } catch {
         // Endpoint doesn't exist, use default
         usersCount = 0;
@@ -78,6 +91,7 @@ export function Dashboard() {
       });
       
       setHealth(healthData);
+      setAiHealth(aiHealthData);
     } catch (err) {
       setError('Failed to load dashboard data');
       console.error(err);
@@ -140,22 +154,89 @@ export function Dashboard() {
         </div>
       )}
 
-      {health && (
-        <Card>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${
-                health.status === 'healthy' ? 'bg-green-500' :
-                health.status === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'
-              }`} />
-              <span className="font-medium">System Status: {health.status}</span>
+      {/* Health Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {health && (
+          <Card>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Server className="w-5 h-5 text-gray-600" />
+                  <span className="font-medium text-gray-900">Backend Service</span>
+                </div>
+                <div className={`w-3 h-3 rounded-full ${
+                  health.status === 'healthy' ? 'bg-green-500' :
+                  health.status === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'
+                }`} />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className={`font-medium ${
+                  health.status === 'healthy' ? 'text-green-600' :
+                  health.status === 'degraded' ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {health.status.charAt(0).toUpperCase() + health.status.slice(1)}
+                </span>
+                <span className="text-gray-500">
+                  {new Date(health.timestamp).toLocaleString()}
+                </span>
+              </div>
             </div>
-            <span className="text-sm text-gray-500">
-              Last checked: {new Date(health.timestamp).toLocaleString()}
-            </span>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
+
+        {aiHealth && (
+          <Card>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-gray-600" />
+                  <span className="font-medium text-gray-900">AI Service</span>
+                  {aiHealth.version && (
+                    <span className="text-xs text-gray-500">v{aiHealth.version}</span>
+                  )}
+                </div>
+                <div className={`w-3 h-3 rounded-full ${
+                  aiHealth.status === 'healthy' ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className={`font-medium ${
+                  aiHealth.status === 'healthy' ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {aiHealth.status === 'healthy' ? 'Healthy' : 'Unhealthy'}
+                </span>
+                <span className="text-gray-500">
+                  {new Date(aiHealth.timestamp).toLocaleString()}
+                </span>
+              </div>
+              {aiHealth.dependencies && Object.keys(aiHealth.dependencies).length > 0 && (
+                <div className="pt-2 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {Object.entries(aiHealth.dependencies).map(([key, value]) => {
+                      const isHealthy = !value.toLowerCase().includes('error') && 
+                                       !value.toLowerCase().includes('failed') &&
+                                       !value.toLowerCase().includes('unavailable');
+                      return (
+                        <div key={key} className="flex items-center gap-1.5">
+                          {isHealthy ? (
+                            <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <XCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-medium text-gray-700 capitalize">{key.replace(/_/g, ' ')}</div>
+                            <div className="text-gray-500 truncate" title={value}>{value}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

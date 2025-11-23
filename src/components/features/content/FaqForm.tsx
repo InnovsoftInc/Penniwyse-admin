@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Input, Button, Select, Checkbox } from '../../ui';
+import { Input, Button, Select } from '../../ui';
 import type { CreateFaqDto, UpdateFaqDto, Faq } from '../../../types/faq.types';
 
 const faqSchema = z.object({

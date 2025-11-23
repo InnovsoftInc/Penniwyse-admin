@@ -19,13 +19,14 @@ export function Form<T extends FieldValues>({
   className,
 }: FormProps<T>) {
   const methods = useForm<T>({
+    // @ts-expect-error - zodResolver type mismatch with react-hook-form generics
     resolver: zodResolver(schema),
-    defaultValues,
+    defaultValues: defaultValues as any,
   });
 
   return (
-    <form onSubmit={methods.handleSubmit(onSubmit)} className={className}>
-      {children(methods)}
+    <form onSubmit={methods.handleSubmit(onSubmit as any)} className={className}>
+      {children(methods as any)}
     </form>
   );
 }

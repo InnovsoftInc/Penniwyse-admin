@@ -4,8 +4,18 @@ import { z } from 'zod';
 import { Input, Button, Select } from '../../ui';
 import type { CronSchedule, CreateCronScheduleDto, UpdateCronScheduleDto } from '../../../types/cron.types';
 
-const scheduleSchema = z.object({
+const createScheduleSchema = z.object({
   jobName: z.string().min(1, 'Job name is required'),
+  cronExpression: z.string().min(1, 'Cron expression is required').regex(
+    /^(\*|([0-9]|[1-5][0-9])|\*\/([0-9]|[1-5][0-9])) (\*|([0-9]|1[0-9]|2[0-3])|\*\/([0-9]|1[0-9]|2[0-3])) (\*|([1-9]|[12][0-9]|3[01])|\*\/([1-9]|[12][0-9]|3[01])) (\*|([1-9]|1[0-2])|\*\/([1-9]|1[0-2])) (\*|([0-6])|\*\/([0-6]))$/,
+    'Invalid cron expression format (use: minute hour day month dayOfWeek)'
+  ),
+  timeZone: z.string().optional(),
+  isActive: z.boolean().optional(),
+  description: z.string().optional(),
+});
+
+const updateScheduleSchema = z.object({
   cronExpression: z.string().min(1, 'Cron expression is required').regex(
     /^(\*|([0-9]|[1-5][0-9])|\*\/([0-9]|[1-5][0-9])) (\*|([0-9]|1[0-9]|2[0-3])|\*\/([0-9]|1[0-9]|2[0-3])) (\*|([1-9]|[12][0-9]|3[01])|\*\/([1-9]|[12][0-9]|3[01])) (\*|([1-9]|1[0-2])|\*\/([1-9]|1[0-2])) (\*|([0-6])|\*\/([0-6]))$/,
     'Invalid cron expression format (use: minute hour day month dayOfWeek)'
@@ -39,7 +49,7 @@ export function ScheduleForm({
     setValue,
     watch,
   } = useForm<ScheduleFormData>({
-    resolver: zodResolver(scheduleSchema),
+    resolver: zodResolver(initialData?.id ? updateScheduleSchema : createScheduleSchema) as any,
     defaultValues: {
       jobName: initialData?.jobName || '',
       cronExpression: initialData?.cronExpression || '',
@@ -77,7 +87,7 @@ export function ScheduleForm({
           {availableJobs.length > 0 ? (
             <Select
               {...register('jobName')}
-              error={errors.jobName?.message}
+              error={(errors as any).jobName?.message}
               required
               placeholder="Select a job"
               options={[
@@ -88,7 +98,7 @@ export function ScheduleForm({
           ) : (
             <Input
               {...register('jobName')}
-              error={errors.jobName?.message}
+              error={(errors as any).jobName?.message}
               required
               placeholder="bill-reminders"
               helperText="Unique identifier for the cron job"

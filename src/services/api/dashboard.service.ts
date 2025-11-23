@@ -1,5 +1,6 @@
 import { apiClient } from '../apiClient';
-import type { DashboardData, DashboardQueryParams, SystemHealth } from '../../types/dashboard.types';
+import { aiApiClient } from '../aiApiClient';
+import type { DashboardData, DashboardQueryParams, SystemHealth, AiServiceHealth } from '../../types/dashboard.types';
 
 class DashboardService {
   // Frontend endpoints
@@ -11,6 +12,12 @@ class DashboardService {
   // Admin endpoints (using JWT auth)
   async getSystemHealth(): Promise<SystemHealth> {
     const response = await apiClient.getClient().get<SystemHealth>('/api/admin/health');
+    return response.data;
+  }
+
+  // AI Service health endpoint
+  async getAiServiceHealth(): Promise<AiServiceHealth> {
+    const response = await aiApiClient.getClient().get<AiServiceHealth>('/health');
     return response.data;
   }
 }

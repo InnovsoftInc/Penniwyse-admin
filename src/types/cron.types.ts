@@ -23,7 +23,7 @@ export interface CronStatus {
       timeZone: string;
     };
   };
-  [key: string]: CronJob | undefined;
+  [key: string]: CronJob | { enabled: boolean; schedule: string; timeZone: string } | { dailyAnalysis?: { schedule: string; timeZone: string }; weeklyCleanup?: { schedule: string; timeZone: string } } | undefined;
 }
 
 export interface CronLog {

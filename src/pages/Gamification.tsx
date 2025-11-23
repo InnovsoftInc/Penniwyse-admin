@@ -29,7 +29,7 @@ export function Gamification() {
   const [error, setError] = useState<string | null>(null);
   const [isQuestActionLoading, setIsQuestActionLoading] = useState(false);
   const [isBadgeActionLoading, setIsBadgeActionLoading] = useState(false);
-  const [deletingQuestId, setDeletingQuestId] = useState<number | null>(null);
+  const [, setDeletingQuestId] = useState<number | null>(null);
   const [deletingBadgeId, setDeletingBadgeId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -200,7 +200,8 @@ export function Gamification() {
 
   const [isConfigActionLoading, setIsConfigActionLoading] = useState(false);
 
-  const handleSaveXPLevels = async (xpLevels: typeof config.xpLevels) => {
+  const handleSaveXPLevels = async (xpLevels: { level: number; xpRequired: number }[]) => {
+    if (!config) return;
     try {
       setIsConfigActionLoading(true);
       await adminGamificationService.updateXPLevels({ xpLevels });
