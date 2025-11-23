@@ -1,0 +1,2 @@
+export { MerchantForm } from './MerchantForm';
+
