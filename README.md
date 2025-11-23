@@ -116,6 +116,11 @@ The project uses Tailwind CSS with a custom design system. See `tailwind.config.
 ## Environment Variables
 
 - `VITE_API_BASE_URL`: Base URL for the backend API (default: http://localhost:3002)
+  - For production: Set to `https://taxable-backend-3nncd.ondigitalocean.app` (or your backend URL)
+  - For HTTPS URLs, no port is needed (uses port 443 by default)
+- `VITE_AI_BASE_URL`: Base URL for the AI service (default: http://localhost:8000)
+- `VITE_SERVICE_NAME`: Service name for AI service authentication (default: taxable-backend)
+- `VITE_SERVICE_TOKEN`: Service token for admin API authentication
 
 ## License
 
