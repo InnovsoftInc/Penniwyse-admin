@@ -59,7 +59,11 @@ export function Dashboard() {
           'dashboard-ai-health',
           () => dashboardService.getAiServiceHealth().catch((err) => {
             // Silently ignore 404s, network errors, or auth errors for AI health endpoint
-            if (err?.response?.status === 404 || err?.isNetworkError || err?.isAuthError) {
+            // But log mixed content errors for visibility
+            if (err?.isMixedContentError) {
+              console.warn('AI service connection blocked by mixed content policy:', err.message);
+            }
+            if (err?.response?.status === 404 || err?.isNetworkError || err?.isAuthError || err?.isMixedContentError) {
               return null;
             }
             console.warn('Failed to load AI service health:', err);

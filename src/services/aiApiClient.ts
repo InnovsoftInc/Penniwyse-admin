@@ -129,6 +129,21 @@ class AiApiClient {
             fullUrl: originalRequest ? `${AI_BASE_URL}${originalRequest.url}` : 'N/A',
           });
           
+          // Check for mixed content error (HTTPS page trying to load HTTP resource)
+          const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+          const isHttpService = AI_BASE_URL.startsWith('http://');
+          const isMixedContent = isHttpsPage && isHttpService;
+          
+          if (isMixedContent) {
+            console.error('[AiApiClient] Mixed Content Error: HTTPS page cannot load HTTP resources');
+            return Promise.reject({
+              ...error,
+              message: `Mixed Content Error: This app is served over HTTPS but is trying to connect to an HTTP service at ${AI_BASE_URL}. Browsers block this for security. Please configure VITE_AI_BASE_URL to use HTTPS, or set up a proxy through your backend server.`,
+              isNetworkError: true,
+              isMixedContentError: true,
+            });
+          }
+          
           if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
             console.error(`[AiApiClient] Cannot connect to AI service at ${AI_BASE_URL}. Make sure the AI service is running.`);
           }

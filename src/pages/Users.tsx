@@ -114,7 +114,7 @@ export function Users() {
       alert('User created successfully');
       setIsCreateUserModalOpen(false);
       // Clear cache and reload users
-      requestCache.clear();
+      requestCache.clearAll();
       await loadUsers();
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create user';
