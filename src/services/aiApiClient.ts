@@ -1,11 +1,39 @@
 import axios, { AxiosError } from 'axios';
-import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import type { AxiosInstance, InternalAxiosRequestConfig, AxiosHeaders } from 'axios';
 import type { ApiError } from '../types/api.types';
 import * as cookieUtils from '../utils/cookies';
 
 const AI_BASE_URL = import.meta.env.VITE_AI_BASE_URL || 'http://localhost:8000';
-const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 const SERVICE_NAME = import.meta.env.VITE_SERVICE_NAME || 'taxable-backend';
+const AI_SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
+
+/**
+ * The AI service currently only allows a limited set of CORS headers.
+ * When we send the optional service token header in the browser it causes
+ * the preflight request to fail, so we only attach it when we are not in
+ * a browser environment (e.g. SSR) or when the AI service shares the
+ * same origin as the frontend.
+ */
+const shouldAttachServiceToken = (): boolean => {
+  if (!AI_SERVICE_TOKEN) {
+    return false;
+  }
+
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  try {
+    const aiUrl = new URL(AI_BASE_URL, window.location.origin);
+    return aiUrl.origin === window.location.origin;
+  } catch (error) {
+    console.warn('[AiApiClient] Unable to parse AI_BASE_URL for service token logic:', {
+      error,
+      AI_BASE_URL,
+    });
+    return false;
+  }
+};
 
 class AiApiClient {
   private client: AxiosInstance;
@@ -17,7 +45,7 @@ class AiApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      withCredentials: true, // Important for sending cookies in cross-origin requests
+      withCredentials: false,
     });
 
     this.setupInterceptors();
@@ -36,17 +64,20 @@ class AiApiClient {
           baseURL: config.baseURL,
           hasToken: !!token,
           tokenLength: token?.length || 0,
-          hasServiceToken: !!SERVICE_TOKEN,
+          hasServiceToken: !!AI_SERVICE_TOKEN,
           serviceName: SERVICE_NAME,
         });
 
         if (!config.headers) {
-          config.headers = {} as any;
+          config.headers = {} as AxiosHeaders;
         }
 
-        // Add service token and service name
-        config.headers['X-Service-Token'] = SERVICE_TOKEN || '';
+        // Add service name for observability on the AI service side
         config.headers['X-Service'] = SERVICE_NAME;
+
+        if (shouldAttachServiceToken()) {
+          config.headers['X-Service-Token'] = AI_SERVICE_TOKEN || '';
+        }
 
         // Always get the latest token from cookies (in case it was refreshed)
         // This ensures we use the newest token even for retries
@@ -67,11 +98,6 @@ class AiApiClient {
           hasAuthorization: !!config.headers['Authorization'],
           authorizationPreview: config.headers['Authorization'] 
             ? `${String(config.headers['Authorization']).substring(0, 30)}...` 
-            : 'none',
-          hasXServiceToken: !!config.headers['X-Service-Token'],
-          xServiceTokenLength: (config.headers['X-Service-Token'] as string)?.length || 0,
-          xServiceTokenPreview: config.headers['X-Service-Token'] 
-            ? `${String(config.headers['X-Service-Token']).substring(0, 10)}...` 
             : 'none',
           xService: config.headers['X-Service'],
           contentType: config.headers['Content-Type'],
@@ -175,8 +201,39 @@ class AiApiClient {
 
         // Handle 401 - authentication required
         if (error.response?.status === 401) {
+          // Helper function to safely extract nested error properties
+          const getNestedError = (obj: unknown, path: string[]): unknown => {
+            let current: unknown = obj;
+            for (const key of path) {
+              if (current && typeof current === 'object' && key in current) {
+                current = (current as Record<string, unknown>)[key];
+              } else {
+                return null;
+              }
+            }
+            return current;
+          };
+
           // Log full error response for debugging
           const errorData = error.response?.data;
+          const loggedErrorMessage = 
+            (typeof errorData === 'object' && errorData && errorData !== null && 'message' in errorData 
+              ? String((errorData as unknown as Record<string, unknown>).message) 
+              : null) || 
+            (getNestedError(errorData, ['error', 'message']) 
+              ? String(getNestedError(errorData, ['error', 'message'])) 
+              : null);
+          
+          const errorObj = getNestedError(errorData, ['error']);
+          const details = 
+            (typeof errorData === 'object' && errorData && errorData !== null && 'details' in errorData 
+              ? (errorData as unknown as Record<string, unknown>).details 
+              : null) || 
+            getNestedError(errorData, ['error', 'details']);
+          
+          const requiredHeaders = getNestedError(errorData, ['details', 'required_headers']) || 
+                                 getNestedError(errorData, ['error', 'details', 'required_headers']);
+
           console.error('[AiApiClient] 401 Unauthorized - Full error response:', {
             url: originalRequest?.url,
             status: error.response?.status,
@@ -184,14 +241,11 @@ class AiApiClient {
             headers: error.response?.headers,
             data: errorData,
             dataType: typeof errorData,
-            dataKeys: errorData && typeof errorData === 'object' ? Object.keys(errorData) : [],
-            message: (typeof errorData === 'object' && errorData && 'message' in errorData ? (errorData as any).message : null) || 
-                     (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'message' in (errorData as any).error ? (errorData as any).error.message : null),
-            error: typeof errorData === 'object' && errorData && 'error' in errorData ? (errorData as any).error : null,
-            details: (typeof errorData === 'object' && errorData && 'details' in errorData ? (errorData as any).details : null) || 
-                    (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'details' in (errorData as any).error ? (errorData as any).error.details : null),
-            requiredHeaders: (typeof errorData === 'object' && errorData && 'details' in errorData && typeof (errorData as any).details === 'object' && (errorData as any).details && 'required_headers' in (errorData as any).details ? (errorData as any).details.required_headers : null) ||
-                            (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'details' in (errorData as any).error && typeof (errorData as any).error.details === 'object' && (errorData as any).error.details && 'required_headers' in (errorData as any).error.details ? (errorData as any).error.details.required_headers : null),
+            dataKeys: errorData && typeof errorData === 'object' && errorData !== null ? Object.keys(errorData) : [],
+            message: loggedErrorMessage,
+            error: errorObj,
+            details,
+            requiredHeaders,
             // Log what headers were sent
             sentHeaders: {
               authorization: originalRequest?.headers?.['Authorization'] ? 'present' : 'missing',
@@ -233,7 +287,7 @@ class AiApiClient {
                     this.refreshTokenPromise = null;
                     
                     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
-                  }).catch((refreshError: any) => {
+                  }).catch((refreshError: AxiosError) => {
                     // Clear the promise on error so retries can happen
                     this.refreshTokenPromise = null;
                     throw refreshError;
@@ -252,15 +306,16 @@ class AiApiClient {
                 
                 console.log('[AiApiClient] Using refreshed token, retrying AI request');
                 return this.client(originalRequest);
-              } catch (refreshError: any) {
+              } catch (refreshError: unknown) {
+                const axiosError = refreshError as AxiosError<ApiError>;
                 console.error('[AiApiClient] Token refresh failed for AI service:', {
-                  status: refreshError?.response?.status,
-                  message: refreshError?.response?.data?.message || refreshError?.message,
-                  isRateLimit: refreshError?.response?.status === 429,
+                  status: axiosError?.response?.status,
+                  message: axiosError?.response?.data?.message || axiosError?.message,
+                  isRateLimit: axiosError?.response?.status === 429,
                 });
                 
                 // If rate limited, don't clear tokens - just reject with a helpful message
-                if (refreshError?.response?.status === 429) {
+                if (axiosError?.response?.status === 429) {
                   return Promise.reject({
                     ...error,
                     message: 'Too many token refresh attempts. Please wait a moment and try again.',
@@ -289,18 +344,24 @@ class AiApiClient {
           }
           
           // If already retried or no refresh token, extract error message and reject
-          let errorMessage = 'Authentication required. Please log in to access AI endpoints.';
-          if (typeof errorData === 'object' && errorData && 'error' in errorData && typeof (errorData as any).error === 'object' && (errorData as any).error && 'message' in (errorData as any).error) {
-            errorMessage = (errorData as any).error.message;
-          } else if (errorData?.message) {
-            errorMessage = errorData.message;
+          let finalErrorMessage = 'Authentication required. Please log in to access AI endpoints.';
+          if (typeof errorData === 'object' && errorData && errorData !== null) {
+            const errorDataRecord = errorData as unknown as Record<string, unknown>;
+            const errorObj = 'error' in errorDataRecord && typeof errorDataRecord.error === 'object' && errorDataRecord.error !== null
+              ? errorDataRecord.error as Record<string, unknown>
+              : null;
+            if (errorObj && 'message' in errorObj && typeof errorObj.message === 'string') {
+              finalErrorMessage = errorObj.message;
+            } else if ('message' in errorDataRecord && typeof errorDataRecord.message === 'string') {
+              finalErrorMessage = errorDataRecord.message;
+            }
           } else if (typeof errorData === 'string') {
-            errorMessage = errorData;
+            finalErrorMessage = errorData;
           }
           
           return Promise.reject({
             ...error,
-            message: errorMessage,
+            message: finalErrorMessage,
             isAuthError: true,
           });
         }
