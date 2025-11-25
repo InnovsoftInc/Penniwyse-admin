@@ -1,4 +1,4 @@
-import { aiApiClient } from '../aiApiClient';
+import { apiClient } from '../apiClient';
 import type { FilesAndJobsResponse, ProcessingJobInfo, FilesAndJobsQueryParams } from '../../types/files-jobs.types';
 import type {
   AiCronJobsResponse,
@@ -45,12 +45,12 @@ class FilesJobsService {
     console.log('[FilesJobsService] Request parameters:', queryParams);
 
     try {
-      console.log('[FilesJobsService] Making request to AI service...');
-      const response = await aiApiClient.getClient().get<FilesAndJobsResponse>(
-        '/ai/jobs/files-and-jobs',
+      console.log('[FilesJobsService] Making request to backend proxy...');
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().get<FilesAndJobsResponse>(
+        '/api/ai/jobs/files-and-jobs',
         {
           params: queryParams,
-          withCredentials: true, // Include cookies in CORS requests
         }
       );
       
@@ -62,22 +62,23 @@ class FilesJobsService {
       });
 
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number; statusText?: string; data?: { message?: string } }; message?: string; isAuthError?: boolean; isNetworkError?: boolean; isRateLimitError?: boolean };
       console.error('[FilesJobsService] Request failed:', {
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        message: error?.response?.data?.message || error?.message,
-        errorDetails: error?.response?.data,
-        isAuthError: error?.isAuthError,
-        isNetworkError: error?.isNetworkError,
-        isRateLimitError: error?.isRateLimitError,
+        status: axiosError?.response?.status,
+        statusText: axiosError?.response?.statusText,
+        message: axiosError?.response?.data?.message || axiosError?.message,
+        errorDetails: axiosError?.response?.data,
+        isAuthError: axiosError?.isAuthError,
+        isNetworkError: axiosError?.isNetworkError,
+        isRateLimitError: axiosError?.isRateLimitError,
       });
       
       // Enhance error with more details
-      if (error?.response?.status === 401 || error?.isAuthError) {
-        const enhancedError = new Error(error?.response?.data?.message || 'Authentication failed. Please log in again.');
-        (enhancedError as any).isAuthError = true;
-        (enhancedError as any).response = error.response;
+      if (axiosError?.response?.status === 401 || axiosError?.isAuthError) {
+        const enhancedError = new Error(axiosError?.response?.data?.message || 'Authentication failed. Please log in again.');
+        (enhancedError as { isAuthError?: boolean; response?: unknown }).isAuthError = true;
+        (enhancedError as { isAuthError?: boolean; response?: unknown }).response = axiosError.response;
         throw enhancedError;
       }
       
@@ -92,13 +93,11 @@ class FilesJobsService {
     });
 
     try {
-      console.log('[FilesJobsService] Making retrigger request to AI service...');
-      const response = await aiApiClient.getClient().post<ProcessingJobInfo>(
-        `/ai/jobs/${jobId}/retrigger`,
-        {},
-        {
-          withCredentials: true,
-        }
+      console.log('[FilesJobsService] Making retrigger request to backend proxy...');
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().post<ProcessingJobInfo>(
+        `/api/ai/jobs/${jobId}/retrigger`,
+        {}
       );
       
       console.log('[FilesJobsService] Retrigger successful:', {
@@ -107,21 +106,22 @@ class FilesJobsService {
       });
 
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number; statusText?: string; data?: { message?: string } }; message?: string; isAuthError?: boolean; isNetworkError?: boolean };
       console.error('[FilesJobsService] Retrigger failed:', {
         jobId,
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        message: error?.response?.data?.message || error?.message,
-        errorDetails: error?.response?.data,
-        isAuthError: error?.isAuthError,
-        isNetworkError: error?.isNetworkError,
+        status: axiosError?.response?.status,
+        statusText: axiosError?.response?.statusText,
+        message: axiosError?.response?.data?.message || axiosError?.message,
+        errorDetails: axiosError?.response?.data,
+        isAuthError: axiosError?.isAuthError,
+        isNetworkError: axiosError?.isNetworkError,
       });
       
-      if (error?.response?.status === 401 || error?.isAuthError) {
-        const enhancedError = new Error(error?.response?.data?.message || 'Authentication failed. Please log in again.');
-        (enhancedError as any).isAuthError = true;
-        (enhancedError as any).response = error.response;
+      if (axiosError?.response?.status === 401 || axiosError?.isAuthError) {
+        const enhancedError = new Error(axiosError?.response?.data?.message || 'Authentication failed. Please log in again.');
+        (enhancedError as { isAuthError?: boolean; response?: unknown }).isAuthError = true;
+        (enhancedError as { isAuthError?: boolean; response?: unknown }).response = axiosError.response;
         throw enhancedError;
       }
       
@@ -133,9 +133,10 @@ class FilesJobsService {
   async getAiCronJobs(): Promise<AiCronJobsResponse> {
     console.log('[FilesJobsService] getAiCronJobs called');
     try {
-      const response = await aiApiClient.getClient().get<AiCronJobsResponse>('/ai/admin/cron/jobs');
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().get<AiCronJobsResponse>('/api/ai/admin/cron/jobs');
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[FilesJobsService] getAiCronJobs failed:', error);
       throw error;
     }
@@ -144,9 +145,10 @@ class FilesJobsService {
   async getAiCronStatus(): Promise<AiCronStatus> {
     console.log('[FilesJobsService] getAiCronStatus called');
     try {
-      const response = await aiApiClient.getClient().get<AiCronStatus>('/ai/admin/cron/status');
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().get<AiCronStatus>('/api/ai/admin/cron/status');
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[FilesJobsService] getAiCronStatus failed:', error);
       throw error;
     }
@@ -164,18 +166,20 @@ class FilesJobsService {
     }
     
     try {
-      const response = await aiApiClient.getClient().post<TriggerCronJobResponse>(
-        '/ai/admin/cron/trigger',
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().post<TriggerCronJobResponse>(
+        '/api/ai/admin/cron/trigger',
         data
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number; data?: { message?: string; detail?: string; availableJobIds?: string[]; available_job_ids?: string[] } }; message?: string };
       console.error('[FilesJobsService] triggerAiCronJob failed:', error);
       
       // Enhance validation errors with helpful messages
-      if (error?.response?.status === 422 || error?.response?.status === 400) {
-        const errorData = error?.response?.data || {};
-        const errorMessage = errorData.message || errorData.detail || error?.message;
+      if (axiosError?.response?.status === 422 || axiosError?.response?.status === 400) {
+        const errorData = axiosError?.response?.data || {};
+        const errorMessage = errorData.message || errorData.detail || axiosError?.message;
         
         // If the error mentions missing jobId, try to provide helpful context
         if (errorMessage && (errorMessage.includes('jobId') || errorMessage.includes('job_id'))) {
@@ -191,14 +195,14 @@ class FilesJobsService {
           }
           
           const enhancedError = new Error(enhancedMessage);
-          (enhancedError as any).response = {
-            ...error.response,
+          (enhancedError as { response?: unknown; isValidationError?: boolean }).response = {
+            ...axiosError.response,
             data: {
               ...errorData,
               availableJobIds: availableJobIds || errorData.availableJobIds,
             },
           };
-          (enhancedError as any).isValidationError = true;
+          (enhancedError as { response?: unknown; isValidationError?: boolean }).isValidationError = true;
           throw enhancedError;
         }
       }
@@ -210,11 +214,12 @@ class FilesJobsService {
   async pauseAiCronService(serviceName: string): Promise<PauseResumeResponse> {
     console.log('[FilesJobsService] pauseAiCronService called:', serviceName);
     try {
-      const response = await aiApiClient.getClient().post<PauseResumeResponse>(
-        `/ai/admin/cron/pause/${serviceName}`
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().post<PauseResumeResponse>(
+        `/api/ai/admin/cron/pause/${serviceName}`
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[FilesJobsService] pauseAiCronService failed:', error);
       throw error;
     }
@@ -223,11 +228,12 @@ class FilesJobsService {
   async resumeAiCronService(serviceName: string): Promise<PauseResumeResponse> {
     console.log('[FilesJobsService] resumeAiCronService called:', serviceName);
     try {
-      const response = await aiApiClient.getClient().post<PauseResumeResponse>(
-        `/ai/admin/cron/resume/${serviceName}`
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().post<PauseResumeResponse>(
+        `/api/ai/admin/cron/resume/${serviceName}`
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[FilesJobsService] resumeAiCronService failed:', error);
       throw error;
     }
@@ -246,8 +252,9 @@ class FilesJobsService {
       if (params?.startDate) backendParams.start_date = params.startDate;
       if (params?.endDate) backendParams.end_date = params.endDate;
 
-      const response = await aiApiClient.getClient().get<CronExecutionHistoryResponseRaw>(
-        '/ai/admin/cron/history',
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().get<CronExecutionHistoryResponseRaw>(
+        '/api/ai/admin/cron/history',
         { params: backendParams }
       );
       
@@ -274,7 +281,7 @@ class FilesJobsService {
         limit: response.data.limit || 50,
         offset: response.data.offset || 0,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[FilesJobsService] getCronExecutionHistory failed:', error);
       throw error;
     }
@@ -289,12 +296,13 @@ class FilesJobsService {
     }
     
     try {
-      const response = await aiApiClient.getClient().post<TriggerAllCronJobsResponse>(
-        '/ai/admin/cron/trigger-all',
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().post<TriggerAllCronJobsResponse>(
+        '/api/ai/admin/cron/trigger-all',
         data
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[FilesJobsService] triggerAllAiCronJobs failed:', error);
       throw error;
     }
@@ -315,9 +323,9 @@ class FilesJobsService {
       if (params?.limit) backendParams.limit = params.limit;
       if (params?.offset) backendParams.offset = params.offset;
 
-      // API returns camelCase directly
-      const response = await aiApiClient.getClient().post<AllInsightsResponseRaw>(
-        '/ai/admin/insights/all',
+      // Use backend proxy endpoint that adds service token server-side
+      const response = await apiClient.getClient().post<AllInsightsResponseRaw>(
+        '/api/ai/admin/insights/all',
         backendParams
       );
       
@@ -356,7 +364,7 @@ class FilesJobsService {
         limit: response.data.limit || 1000,
         offset: response.data.offset || 0,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[FilesJobsService] getAllInsights failed:', error);
       throw error;
     }
