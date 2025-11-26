@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Users } from './pages/Users';
+import { UserDetails } from './pages/UserDetails';
 import { Transactions } from './pages/Transactions';
 import { Categories } from './pages/Categories';
 import { Merchants } from './pages/Merchants';
@@ -34,6 +35,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users/:userId"
+            element={
+              <ProtectedRoute>
+                <UserDetails />
               </ProtectedRoute>
             }
           />

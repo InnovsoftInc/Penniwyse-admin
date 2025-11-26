@@ -86,6 +86,21 @@ class UsersService {
     );
     return response.data;
   }
+
+  async getUserDetails(userId: number): Promise<import('../../types/user.types').UserDetailsResponse> {
+    const response = await apiClient.getClient().get<import('../../types/user.types').UserDetailsResponse>(
+      `/api/admin/users/${userId}/details`
+    );
+    return response.data;
+  }
+
+  async getUserPushLogs(userId: number, params?: QueryParams): Promise<any> {
+    const response = await apiClient.getClient().get<any>(
+      `/api/admin/users/${userId}/push-logs`,
+      { params }
+    );
+    return response.data;
+  }
 }
 
 export const usersService = new UsersService();

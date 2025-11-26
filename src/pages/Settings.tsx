@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Clock, Eye, Plus, Edit, Trash2, Play, Pause, PlayCircle } from 'lucide-react';
-import { Card, Button, Input, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Pagination, Modal } from '../components/ui';
+import { RefreshCw, Clock, Eye, Plus, Edit, Trash2, Play, Pause, PlayCircle, Bell } from 'lucide-react';
+import { Card, Button, Input, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Pagination, Modal, Select } from '../components/ui';
 import { cronService } from '../services/api/cron.service';
 import { dashboardService } from '../services/api/dashboard.service';
 import { filesJobsService } from '../services/api/files-jobs.service';
+import { pushNotificationsService } from '../services/api/push-notifications.service';
 import { ScheduleForm } from '../components/features/cron';
 import type { CronStatus, CronLog, CronJobInfo, CronSchedule, CreateCronScheduleDto, UpdateCronScheduleDto } from '../types/cron.types';
 import type { AiCronJobsResponse, AiCronStatus, CronJobExecution, CronExecutionHistoryQueryParams } from '../types/ai-cron.types';
+import type { PushNotificationLog, PushNotificationStatus, PushLogsQueryParams } from '../types/push-notification.types';
 import { formatDateTime } from '../utils/formatters';
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<'general' | 'cron-schedules' | 'cron-jobs' | 'cron-logs' | 'ai-cron-jobs' | 'ai-logs'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'cron-schedules' | 'cron-jobs' | 'cron-logs' | 'ai-cron-jobs' | 'ai-logs' | 'push-logs'>('general');
   
   const [, setCronStatus] = useState<CronStatus | null>(null);
   const [recentLogs, setRecentLogs] = useState<CronLog[]>([]);
@@ -51,6 +53,17 @@ export function Settings() {
   const [selectedExecution, setSelectedExecution] = useState<CronJobExecution | null>(null);
   const [isExecutionModalOpen, setIsExecutionModalOpen] = useState(false);
 
+  // Push Notification Logs state
+  const [pushLogs, setPushLogs] = useState<PushNotificationLog[]>([]);
+  const [isPushLogsLoading, setIsPushLogsLoading] = useState(false);
+  const [pushLogsFilters, setPushLogsFilters] = useState<PushLogsQueryParams>({
+    limit: 100,
+    offset: 0,
+  });
+  const [pushLogsPagination, setPushLogsPagination] = useState({ total: 0, page: 1, limit: 100, totalPages: 1 });
+  const [selectedPushLog, setSelectedPushLog] = useState<PushNotificationLog | null>(null);
+  const [isPushLogModalOpen, setIsPushLogModalOpen] = useState(false);
+
   useEffect(() => {
     if (activeTab === 'cron-logs' || activeTab === 'cron-jobs') {
     loadSettings();
@@ -70,6 +83,13 @@ export function Settings() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, historyPagination.page, historyPagination.limit, historyFilters.serviceName, historyFilters.status, historyFilters.jobId]);
+
+  useEffect(() => {
+    if (activeTab === 'push-logs') {
+      loadPushLogs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, pushLogsPagination.page, pushLogsPagination.limit, pushLogsFilters.userId, pushLogsFilters.status, pushLogsFilters.startDate, pushLogsFilters.endDate]);
 
   const loadSettings = async () => {
     try {
@@ -458,6 +478,37 @@ export function Settings() {
     setIsExecutionModalOpen(true);
   };
 
+  const loadPushLogs = async () => {
+    try {
+      setIsPushLogsLoading(true);
+      setError(null);
+      const params: PushLogsQueryParams = {
+        ...pushLogsFilters,
+        limit: pushLogsPagination.limit,
+        offset: (pushLogsPagination.page - 1) * pushLogsPagination.limit,
+      };
+      const response = await pushNotificationsService.getPushLogs(params);
+      setPushLogs(response.logs || []);
+      setPushLogsPagination(prev => ({
+        ...prev,
+        total: response.pagination?.total || 0,
+        totalPages: response.pagination?.totalPages || 1,
+      }));
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load push notification logs';
+      setError(errorMessage);
+      console.error('Error loading push notification logs:', err);
+      setPushLogs([]);
+    } finally {
+      setIsPushLogsLoading(false);
+    }
+  };
+
+  const handleViewPushLog = (log: PushNotificationLog) => {
+    setSelectedPushLog(log);
+    setIsPushLogModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -479,6 +530,7 @@ export function Settings() {
           { id: 'cron-logs', label: 'Cron Logs' },
           { id: 'ai-cron-jobs', label: 'AI Cron Jobs' },
           { id: 'ai-logs', label: 'AI Logs' },
+          { id: 'push-logs', label: 'Push Notification Logs' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1527,6 +1579,291 @@ export function Settings() {
                   <div className="mt-2 bg-gray-50 rounded-lg p-3 max-h-96 overflow-y-auto">
                     <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono">
                       {JSON.stringify(selectedExecution.executionDetails, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Push Notification Logs Tab */}
+      {activeTab === 'push-logs' && (
+        <div className="space-y-6">
+          <Card title="Push Notification Logs">
+            <div className="mb-4 flex items-center gap-4 flex-wrap">
+              <Input
+                type="number"
+                placeholder="Filter by User ID..."
+                value={pushLogsFilters.userId || ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...pushLogsFilters, 
+                    userId: e.target.value ? Number(e.target.value) : undefined 
+                  };
+                  setPushLogsFilters(newFilters);
+                  setPushLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <select
+                value={pushLogsFilters.status || ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...pushLogsFilters, 
+                    status: e.target.value as PushNotificationStatus | undefined || undefined 
+                  };
+                  setPushLogsFilters(newFilters);
+                  setPushLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+              >
+                <option value="">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="sent">Sent</option>
+                <option value="delivered">Delivered</option>
+                <option value="failed">Failed</option>
+                <option value="error">Error</option>
+              </select>
+              <Input
+                type="date"
+                placeholder="Start Date"
+                value={pushLogsFilters.startDate ? pushLogsFilters.startDate.split('T')[0] : ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...pushLogsFilters, 
+                    startDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : undefined 
+                  };
+                  setPushLogsFilters(newFilters);
+                  setPushLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <Input
+                type="date"
+                placeholder="End Date"
+                value={pushLogsFilters.endDate ? pushLogsFilters.endDate.split('T')[0] : ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...pushLogsFilters, 
+                    endDate: e.target.value ? `${e.target.value}T23:59:59.999Z` : undefined 
+                  };
+                  setPushLogsFilters(newFilters);
+                  setPushLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <Button
+                onClick={loadPushLogs}
+                disabled={isPushLogsLoading}
+                size="sm"
+                variant="secondary"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isPushLogsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+
+            <Table isLoading={isPushLogsLoading} emptyMessage="No push notification logs found">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Body</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Device</TableHead>
+                  <TableHead>Sent At</TableHead>
+                  <TableHead>Delivered At</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pushLogs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell>
+                      {log.user ? (
+                        <div>
+                          <div className="font-medium">{log.user.email}</div>
+                          <div className="text-xs text-gray-500">ID: {log.user.id}</div>
+                        </div>
+                      ) : (
+                        `User ${log.userId}`
+                      )}
+                    </TableCell>
+                    <TableCell>{log.title}</TableCell>
+                    <TableCell className="max-w-xs truncate">{log.body}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        log.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                        log.status === 'failed' || log.status === 'error' ? 'bg-red-100 text-red-700' :
+                        log.status === 'sent' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>{log.deviceName || log.deviceId || 'N/A'}</TableCell>
+                    <TableCell>{log.sentAt ? formatDateTime(log.sentAt) : 'N/A'}</TableCell>
+                    <TableCell>{log.deliveredAt ? formatDateTime(log.deliveredAt) : 'N/A'}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewPushLog(log)}
+                        title="View log details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {pushLogsPagination.totalPages > 1 && (
+              <div className="mt-4">
+                <Pagination
+                  currentPage={pushLogsPagination.page}
+                  totalPages={pushLogsPagination.totalPages}
+                  totalItems={pushLogsPagination.total}
+                  itemsPerPage={pushLogsPagination.limit}
+                  onPageChange={(page) => setPushLogsPagination(prev => ({ ...prev, page }))}
+                  onItemsPerPageChange={(limit) => setPushLogsPagination(prev => ({ ...prev, limit, page: 1 }))}
+                />
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Push Log Details Modal */}
+      <Modal
+        isOpen={isPushLogModalOpen}
+        onClose={() => {
+          setIsPushLogModalOpen(false);
+          setSelectedPushLog(null);
+        }}
+        title={`Push Notification Log Details: ${selectedPushLog?.title || 'Unknown'}`}
+        size="lg"
+      >
+        {selectedPushLog && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">User</label>
+                <p className="text-sm text-gray-900">
+                  {selectedPushLog.user ? `${selectedPushLog.user.email} (ID: ${selectedPushLog.user.id})` : `User ID: ${selectedPushLog.userId}`}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <span className={`px-2 py-1 text-xs rounded inline-block ${
+                  selectedPushLog.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                  selectedPushLog.status === 'failed' || selectedPushLog.status === 'error' ? 'bg-red-100 text-red-700' :
+                  selectedPushLog.status === 'sent' ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {selectedPushLog.status}
+                </span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <p className="text-sm text-gray-900">{selectedPushLog.title}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+                <p className="text-sm text-gray-900">{selectedPushLog.body}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Device</label>
+                <p className="text-sm text-gray-900">{selectedPushLog.deviceName || selectedPushLog.deviceId || 'N/A'}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Push Token</label>
+                <p className="text-sm text-gray-900 font-mono text-xs truncate">{selectedPushLog.pushToken}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sent At</label>
+                <p className="text-sm text-gray-900">{selectedPushLog.sentAt ? formatDateTime(selectedPushLog.sentAt) : 'N/A'}</p>
+              </div>
+              {selectedPushLog.deliveredAt && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivered At</label>
+                  <p className="text-sm text-gray-900">{formatDateTime(selectedPushLog.deliveredAt)}</p>
+                </div>
+              )}
+              {selectedPushLog.failedAt && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Failed At</label>
+                  <p className="text-sm text-gray-900">{formatDateTime(selectedPushLog.failedAt)}</p>
+                </div>
+              )}
+              {selectedPushLog.errorCode && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Error Code</label>
+                  <p className="text-sm text-red-900">{selectedPushLog.errorCode}</p>
+                </div>
+              )}
+              {selectedPushLog.errorMessage && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Error Message</label>
+                  <p className="text-sm text-red-900">{selectedPushLog.errorMessage}</p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Retry Count</label>
+                <p className="text-sm text-gray-900">{selectedPushLog.retryCount}</p>
+              </div>
+            </div>
+
+            {selectedPushLog.notification && (
+              <div className="pt-4 border-t border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Notification</label>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-sm text-gray-900"><strong>Type:</strong> {selectedPushLog.notification.type}</p>
+                  <p className="text-sm text-gray-900"><strong>Title:</strong> {selectedPushLog.notification.title || 'N/A'}</p>
+                  <p className="text-sm text-gray-900"><strong>Message:</strong> {selectedPushLog.notification.message}</p>
+                </div>
+              </div>
+            )}
+
+            {selectedPushLog.data && Object.keys(selectedPushLog.data).length > 0 && (
+              <div className="pt-4 border-t border-gray-200">
+                <details className="group">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100">
+                      <label className="block text-sm font-medium text-gray-700 cursor-pointer">
+                        Data Payload
+                      </label>
+                      <span className="text-xs text-gray-500 group-open:hidden">Click to expand</span>
+                      <span className="text-xs text-gray-500 hidden group-open:inline">Click to collapse</span>
+                    </div>
+                  </summary>
+                  <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <pre className="text-xs text-gray-800 overflow-auto max-h-96 whitespace-pre-wrap font-mono">
+                      {JSON.stringify(selectedPushLog.data, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              </div>
+            )}
+
+            {selectedPushLog.metadata && Object.keys(selectedPushLog.metadata).length > 0 && (
+              <div className="pt-4 border-t border-gray-200">
+                <details className="group">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100">
+                      <label className="block text-sm font-medium text-gray-700 cursor-pointer">
+                        Metadata
+                      </label>
+                      <span className="text-xs text-gray-500 group-open:hidden">Click to expand</span>
+                      <span className="text-xs text-gray-500 hidden group-open:inline">Click to collapse</span>
+                    </div>
+                  </summary>
+                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <pre className="text-xs text-gray-800 overflow-auto max-h-96 whitespace-pre-wrap font-mono">
+                      {JSON.stringify(selectedPushLog.metadata, null, 2)}
                     </pre>
                   </div>
                 </details>
