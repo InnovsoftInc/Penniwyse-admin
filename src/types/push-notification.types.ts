@@ -1,10 +1,12 @@
-export enum PushNotificationStatus {
-  PENDING = 'pending',
-  SENT = 'sent',
-  DELIVERED = 'delivered',
-  FAILED = 'failed',
-  ERROR = 'error',
-}
+export const PushNotificationStatus = {
+  PENDING: 'pending',
+  SENT: 'sent',
+  DELIVERED: 'delivered',
+  FAILED: 'failed',
+  ERROR: 'error',
+} as const;
+
+export type PushNotificationStatus = typeof PushNotificationStatus[keyof typeof PushNotificationStatus];
 
 export interface PushNotificationLog {
   id: number;

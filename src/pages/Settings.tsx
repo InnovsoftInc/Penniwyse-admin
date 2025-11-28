@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Clock, Eye, Plus, Edit, Trash2, Play, Pause, PlayCircle, Bell } from 'lucide-react';
-import { Card, Button, Input, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Pagination, Modal, Select } from '../components/ui';
+import { RefreshCw, Clock, Eye, Plus, Edit, Trash2, Play, Pause, PlayCircle } from 'lucide-react';
+import { Card, Button, Input, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Pagination, Modal } from '../components/ui';
 import { cronService } from '../services/api/cron.service';
 import { dashboardService } from '../services/api/dashboard.service';
 import { filesJobsService } from '../services/api/files-jobs.service';

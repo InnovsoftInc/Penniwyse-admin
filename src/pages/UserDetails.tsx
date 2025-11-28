@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Button, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui';
 import { usersService } from '../services/api/users.service';
 import { formatDate, formatDateTime, formatCurrency } from '../utils/formatters';
-import { ArrowLeft, Trophy, Award, Smartphone, Bell, CreditCard, Wallet, TrendingUp, Target, Calendar, FileText, Gamepad2 } from 'lucide-react';
-import type { PushNotificationLog, PushNotificationStatistics } from '../types/push-notification.types';
+import { ArrowLeft, Award, Smartphone, Bell, CreditCard, Wallet, TrendingUp, Target, Calendar, FileText, Gamepad2 } from 'lucide-react';
+import type { PushNotificationLog } from '../types/push-notification.types';
 import type { UserDetailsResponse } from '../types/user.types';
 
 type TabType = 'profile' | 'devices' | 'notifications' | 'push-logs' | 'badges' | 'integrations' | 'financial-accounts' | 'credit-cards' | 'transactions' | 'budgets' | 'savings-goals' | 'reminders' | 'notes' | 'gamification';
