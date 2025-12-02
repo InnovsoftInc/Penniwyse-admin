@@ -1,4 +1,5 @@
 import { apiClient } from '../apiClient';
+import type { PlaidLogsResponse, PlaidLogsQueryParams } from '../../types/plaid.types';
 
 interface PlaidLinkTokenResponse {
   linkToken: string;
@@ -50,6 +51,15 @@ class PlaidService {
 
   async disconnect(): Promise<{ message: string }> {
     const response = await apiClient.getClient().post<{ message: string }>('/api/integrations/plaid/disconnect');
+    return response.data;
+  }
+
+  // Admin endpoint: Get Plaid API logs
+  async getPlaidLogs(params?: PlaidLogsQueryParams): Promise<PlaidLogsResponse> {
+    const response = await apiClient.getClient().get<PlaidLogsResponse>(
+      '/api/admin/plaid-logs',
+      { params }
+    );
     return response.data;
   }
 }

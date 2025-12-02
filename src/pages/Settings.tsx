@@ -5,14 +5,16 @@ import { cronService } from '../services/api/cron.service';
 import { dashboardService } from '../services/api/dashboard.service';
 import { filesJobsService } from '../services/api/files-jobs.service';
 import { pushNotificationsService } from '../services/api/push-notifications.service';
+import { plaidService } from '../services/api/plaid.service';
 import { ScheduleForm } from '../components/features/cron';
 import type { CronStatus, CronLog, CronJobInfo, CronSchedule, CreateCronScheduleDto, UpdateCronScheduleDto } from '../types/cron.types';
 import type { AiCronJobsResponse, AiCronStatus, CronJobExecution, CronExecutionHistoryQueryParams } from '../types/ai-cron.types';
 import type { PushNotificationLog, PushNotificationStatus, PushLogsQueryParams } from '../types/push-notification.types';
+import type { PlaidLog, PlaidLogsQueryParams } from '../types/plaid.types';
 import { formatDateTime } from '../utils/formatters';
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<'general' | 'cron-schedules' | 'cron-jobs' | 'cron-logs' | 'ai-cron-jobs' | 'ai-logs' | 'push-logs'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'cron-schedules' | 'cron-jobs' | 'cron-logs' | 'ai-cron-jobs' | 'ai-logs' | 'push-logs' | 'plaid-logs'>('general');
   
   const [, setCronStatus] = useState<CronStatus | null>(null);
   const [recentLogs, setRecentLogs] = useState<CronLog[]>([]);
@@ -64,6 +66,17 @@ export function Settings() {
   const [selectedPushLog, setSelectedPushLog] = useState<PushNotificationLog | null>(null);
   const [isPushLogModalOpen, setIsPushLogModalOpen] = useState(false);
 
+  // Plaid Logs state
+  const [plaidLogs, setPlaidLogs] = useState<PlaidLog[]>([]);
+  const [isPlaidLogsLoading, setIsPlaidLogsLoading] = useState(false);
+  const [plaidLogsFilters, setPlaidLogsFilters] = useState<PlaidLogsQueryParams>({
+    limit: 100,
+    offset: 0,
+  });
+  const [plaidLogsPagination, setPlaidLogsPagination] = useState({ total: 0, page: 1, limit: 100, totalPages: 1 });
+  const [selectedPlaidLog, setSelectedPlaidLog] = useState<PlaidLog | null>(null);
+  const [isPlaidLogModalOpen, setIsPlaidLogModalOpen] = useState(false);
+
   useEffect(() => {
     if (activeTab === 'cron-logs' || activeTab === 'cron-jobs') {
     loadSettings();
@@ -90,6 +103,13 @@ export function Settings() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, pushLogsPagination.page, pushLogsPagination.limit, pushLogsFilters.userId, pushLogsFilters.status, pushLogsFilters.startDate, pushLogsFilters.endDate]);
+
+  useEffect(() => {
+    if (activeTab === 'plaid-logs') {
+      loadPlaidLogs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, plaidLogsPagination.page, plaidLogsPagination.limit, plaidLogsFilters.userId, plaidLogsFilters.endpoint, plaidLogsFilters.status, plaidLogsFilters.requestId, plaidLogsFilters.startDate, plaidLogsFilters.endDate]);
 
   const loadSettings = async () => {
     try {
@@ -509,6 +529,37 @@ export function Settings() {
     setIsPushLogModalOpen(true);
   };
 
+  const loadPlaidLogs = async () => {
+    try {
+      setIsPlaidLogsLoading(true);
+      setError(null);
+      const params: PlaidLogsQueryParams = {
+        ...plaidLogsFilters,
+        limit: plaidLogsPagination.limit,
+        offset: (plaidLogsPagination.page - 1) * plaidLogsPagination.limit,
+      };
+      const response = await plaidService.getPlaidLogs(params);
+      setPlaidLogs(response.logs || []);
+      setPlaidLogsPagination(prev => ({
+        ...prev,
+        total: response.pagination?.total || 0,
+        totalPages: response.pagination?.totalPages || 1,
+      }));
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load Plaid API logs';
+      setError(errorMessage);
+      console.error('Error loading Plaid API logs:', err);
+      setPlaidLogs([]);
+    } finally {
+      setIsPlaidLogsLoading(false);
+    }
+  };
+
+  const handleViewPlaidLog = (log: PlaidLog) => {
+    setSelectedPlaidLog(log);
+    setIsPlaidLogModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -531,6 +582,7 @@ export function Settings() {
           { id: 'ai-cron-jobs', label: 'AI Cron Jobs' },
           { id: 'ai-logs', label: 'AI Logs' },
           { id: 'push-logs', label: 'Push Notification Logs' },
+          { id: 'plaid-logs', label: 'Plaid API Logs' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1864,6 +1916,330 @@ export function Settings() {
                   <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
                     <pre className="text-xs text-gray-800 overflow-auto max-h-96 whitespace-pre-wrap font-mono">
                       {JSON.stringify(selectedPushLog.metadata, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Plaid API Logs Tab */}
+      {activeTab === 'plaid-logs' && (
+        <div className="space-y-6">
+          <Card title="Plaid API Logs">
+            <div className="mb-4 flex items-center gap-4 flex-wrap">
+              <Input
+                type="number"
+                placeholder="User ID"
+                value={plaidLogsFilters.userId || ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...plaidLogsFilters, 
+                    userId: e.target.value ? Number(e.target.value) : undefined 
+                  };
+                  setPlaidLogsFilters(newFilters);
+                  setPlaidLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <Input
+                type="text"
+                placeholder="Endpoint (e.g., /link/token/create)"
+                value={plaidLogsFilters.endpoint || ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...plaidLogsFilters, 
+                    endpoint: e.target.value || undefined 
+                  };
+                  setPlaidLogsFilters(newFilters);
+                  setPlaidLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <select
+                value={plaidLogsFilters.status || ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...plaidLogsFilters, 
+                    status: e.target.value as 'success' | 'error' | undefined || undefined 
+                  };
+                  setPlaidLogsFilters(newFilters);
+                  setPlaidLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+              >
+                <option value="">All Status</option>
+                <option value="success">Success</option>
+                <option value="error">Error</option>
+              </select>
+              <Input
+                type="text"
+                placeholder="Request ID"
+                value={plaidLogsFilters.requestId || ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...plaidLogsFilters, 
+                    requestId: e.target.value || undefined 
+                  };
+                  setPlaidLogsFilters(newFilters);
+                  setPlaidLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <Input
+                type="date"
+                placeholder="Start Date"
+                value={plaidLogsFilters.startDate ? plaidLogsFilters.startDate.split('T')[0] : ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...plaidLogsFilters, 
+                    startDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : undefined 
+                  };
+                  setPlaidLogsFilters(newFilters);
+                  setPlaidLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <Input
+                type="date"
+                placeholder="End Date"
+                value={plaidLogsFilters.endDate ? plaidLogsFilters.endDate.split('T')[0] : ''}
+                onChange={(e) => {
+                  const newFilters = { 
+                    ...plaidLogsFilters, 
+                    endDate: e.target.value ? `${e.target.value}T23:59:59.999Z` : undefined 
+                  };
+                  setPlaidLogsFilters(newFilters);
+                  setPlaidLogsPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                className="max-w-xs"
+              />
+              <Button
+                onClick={loadPlaidLogs}
+                disabled={isPlaidLogsLoading}
+                size="sm"
+                variant="secondary"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isPlaidLogsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+
+            <Table isLoading={isPlaidLogsLoading} emptyMessage="No Plaid API logs found">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Endpoint</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Status Code</TableHead>
+                  <TableHead>Request ID</TableHead>
+                  <TableHead>Environment</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {plaidLogs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell>{formatDateTime(log.createdAt)}</TableCell>
+                    <TableCell>
+                      {log.user ? (
+                        <div>
+                          <div className="font-medium">{log.user.email}</div>
+                          <div className="text-xs text-gray-500">ID: {log.user.id}</div>
+                        </div>
+                      ) : (
+                        `User ${log.userId}`
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{log.endpoint}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
+                        {log.method}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        log.status === 'success' ? 'bg-green-100 text-green-700' :
+                        log.status === 'error' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        log.statusCode >= 200 && log.statusCode < 300 ? 'bg-green-100 text-green-700' :
+                        log.statusCode >= 400 ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {log.statusCode}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{log.requestId}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
+                        {log.environment}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewPlaidLog(log)}
+                        title="View log details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {plaidLogsPagination.totalPages > 1 && (
+              <div className="mt-4">
+                <Pagination
+                  currentPage={plaidLogsPagination.page}
+                  totalPages={plaidLogsPagination.totalPages}
+                  totalItems={plaidLogsPagination.total}
+                  itemsPerPage={plaidLogsPagination.limit}
+                  onPageChange={(page) => setPlaidLogsPagination(prev => ({ ...prev, page }))}
+                  onItemsPerPageChange={(limit) => setPlaidLogsPagination(prev => ({ ...prev, limit, page: 1 }))}
+                />
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Plaid Log Details Modal */}
+      <Modal
+        isOpen={isPlaidLogModalOpen}
+        onClose={() => {
+          setIsPlaidLogModalOpen(false);
+          setSelectedPlaidLog(null);
+        }}
+        title={`Plaid API Log Details: ${selectedPlaidLog?.endpoint || 'Unknown'}`}
+        size="lg"
+      >
+        {selectedPlaidLog && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">User</label>
+                <p className="text-sm text-gray-900">
+                  {selectedPlaidLog.user ? `${selectedPlaidLog.user.email} (ID: ${selectedPlaidLog.user.id})` : `User ID: ${selectedPlaidLog.userId}`}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <span className={`px-2 py-1 text-xs rounded inline-block ${
+                  selectedPlaidLog.status === 'success' ? 'bg-green-100 text-green-700' :
+                  selectedPlaidLog.status === 'error' ? 'bg-red-100 text-red-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {selectedPlaidLog.status}
+                </span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Endpoint</label>
+                <p className="text-sm text-gray-900 font-mono">{selectedPlaidLog.endpoint}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Method</label>
+                <p className="text-sm text-gray-900">{selectedPlaidLog.method}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Request ID</label>
+                <p className="text-sm text-gray-900 font-mono text-xs">{selectedPlaidLog.requestId}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status Code</label>
+                <span className={`px-2 py-1 text-xs rounded inline-block ${
+                  selectedPlaidLog.statusCode >= 200 && selectedPlaidLog.statusCode < 300 ? 'bg-green-100 text-green-700' :
+                  selectedPlaidLog.statusCode >= 400 ? 'bg-red-100 text-red-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {selectedPlaidLog.statusCode}
+                </span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Environment</label>
+                <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded inline-block">
+                  {selectedPlaidLog.environment}
+                </span>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created At</label>
+                <p className="text-sm text-gray-900">{formatDateTime(selectedPlaidLog.createdAt)}</p>
+              </div>
+            </div>
+
+            {selectedPlaidLog.errorCode && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Error Code</label>
+                <p className="text-sm text-red-900 font-mono">{selectedPlaidLog.errorCode}</p>
+              </div>
+            )}
+
+            {selectedPlaidLog.errorType && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Error Type</label>
+                <p className="text-sm text-red-900 font-mono">{selectedPlaidLog.errorType}</p>
+              </div>
+            )}
+
+            {selectedPlaidLog.errorMessage && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Error Message</label>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-800 whitespace-pre-wrap font-mono">
+                    {selectedPlaidLog.errorMessage}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {selectedPlaidLog.requestPayload && Object.keys(selectedPlaidLog.requestPayload).length > 0 && (
+              <div className="pt-4 border-t border-gray-200">
+                <details className="group">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100">
+                      <label className="block text-sm font-medium text-gray-700 cursor-pointer">
+                        Request Payload
+                      </label>
+                      <span className="text-xs text-gray-500 group-open:hidden">Click to expand</span>
+                      <span className="text-xs text-gray-500 hidden group-open:inline">Click to collapse</span>
+                    </div>
+                  </summary>
+                  <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <pre className="text-xs text-gray-800 overflow-auto max-h-96 whitespace-pre-wrap font-mono">
+                      {JSON.stringify(selectedPlaidLog.requestPayload, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              </div>
+            )}
+
+            {selectedPlaidLog.responsePayload && Object.keys(selectedPlaidLog.responsePayload).length > 0 && (
+              <div className="pt-4 border-t border-gray-200">
+                <details className="group">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100">
+                      <label className="block text-sm font-medium text-gray-700 cursor-pointer">
+                        Response Payload
+                      </label>
+                      <span className="text-xs text-gray-500 group-open:hidden">Click to expand</span>
+                      <span className="text-xs text-gray-500 hidden group-open:inline">Click to collapse</span>
+                    </div>
+                  </summary>
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <pre className="text-xs text-gray-800 overflow-auto max-h-96 whitespace-pre-wrap font-mono">
+                      {JSON.stringify(selectedPlaidLog.responsePayload, null, 2)}
                     </pre>
                   </div>
                 </details>
